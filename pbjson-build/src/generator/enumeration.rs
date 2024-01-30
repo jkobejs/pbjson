@@ -20,7 +20,6 @@ pub fn generate_enum<W: Write>(
     descriptor: &EnumDescriptor,
     writer: &mut W,
     use_integers_for_enums: bool,
-    enums_to_lowercase: bool,
 ) -> Result<()> {
     let rust_type = resolver.rust_type(path);
 
@@ -32,10 +31,16 @@ pub fn generate_enum<W: Write>(
         // Protobuf's `allow_alias` option permits duplicates if set
         .filter(|variant| seen_numbers.insert(variant.number()))
         .map(|variant| {
-            let variant_name = variant.name.clone().unwrap();
+            let variant_name = variant.name.clone().unwrap_or_default();
             let variant_number = variant.number();
             let rust_variant = resolver.rust_variant(path, &variant_name);
-            (variant_name, variant_number, rust_variant)
+            let variant_name_value = resolver.variant_name_value(path, &variant_name);
+            (
+                variant_name,
+                variant_number,
+                rust_variant,
+                variant_name_value,
+            )
         })
         .collect();
 
@@ -43,7 +48,7 @@ pub fn generate_enum<W: Write>(
     write_serialize_start(0, &rust_type, writer)?;
     if use_integers_for_enums {
         writeln!(writer, "{}let variant = match self {{", Indent(2))?;
-        for (_, variant_number, rust_variant) in &variants {
+        for (_, variant_number, rust_variant, _) in &variants {
             writeln!(
                 writer,
                 "{}Self::{} => {},",
@@ -57,19 +62,13 @@ pub fn generate_enum<W: Write>(
         writeln!(writer, "{}serializer.serialize_i32(variant)", Indent(2))?;
     } else {
         writeln!(writer, "{}let variant = match self {{", Indent(2))?;
-        for (variant_name, _, rust_variant) in &variants {
-            let renamed_variant_name = if enums_to_lowercase {
-                variant_name.to_lowercase()
-            } else {
-                variant_name.clone()
-            };
-
+        for (_, _, rust_variant, variant_name_value) in &variants {
             writeln!(
                 writer,
                 "{}Self::{} => \"{}\",",
                 Indent(3),
                 rust_variant,
-                renamed_variant_name
+                variant_name_value
             )?;
         }
         writeln!(writer, "{}}};", Indent(2))?;
@@ -80,8 +79,12 @@ pub fn generate_enum<W: Write>(
 
     // Generate Deserialize
     write_deserialize_start(0, &rust_type, writer)?;
-    write_fields_array(writer, 2, variants.iter().map(|(name, _, _)| name.as_str()))?;
-    write_visitor(writer, 2, &rust_type, &variants, enums_to_lowercase)?;
+    write_fields_array(
+        writer,
+        2,
+        variants.iter().map(|(name, _, _, _)| name.as_str()),
+    )?;
+    write_visitor(writer, 2, &rust_type, &variants)?;
 
     // Use deserialize_any to allow users to provide integers or strings
     writeln!(
@@ -98,8 +101,7 @@ fn write_visitor<W: Write>(
     writer: &mut W,
     indent: usize,
     rust_type: &str,
-    variants: &[(String, i32, String)],
-    enums_to_lowercase: bool,
+    variants: &[(String, i32, String, String)],
 ) -> Result<()> {
     // Protobuf supports deserialization of enumerations both from string and integer values
     writeln!(
@@ -146,17 +148,12 @@ fn write_visitor<W: Write>(
     )?;
 
     writeln!(writer, "{}match value {{", Indent(indent + 2))?;
-    for (variant_name, _, rust_variant) in variants {
-        let renamed_variant_name = if enums_to_lowercase {
-            variant_name.to_lowercase()
-        } else {
-            variant_name.clone()
-        };
+    for (_, _, rust_variant, variant_name_value) in variants {
         writeln!(
             writer,
             "{}\"{}\" => Ok({}::{}),",
             Indent(indent + 3),
-            renamed_variant_name,
+            variant_name_value,
             rust_type,
             rust_variant
         )?;

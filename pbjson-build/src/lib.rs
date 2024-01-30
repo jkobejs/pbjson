@@ -108,7 +108,7 @@ pub struct Builder {
     emit_fields: bool,
     use_integers_for_enums: bool,
     preserve_proto_field_names: bool,
-    enums_to_lowercase: bool,
+    strip_enum_vairant_prefix_and_to_lowercase: bool,
 }
 
 impl Builder {
@@ -200,9 +200,9 @@ impl Builder {
         self
     }
 
-    /// Serde enums to lowercase
-    pub fn enums_to_lowercase(&mut self) -> &mut Self {
-        self.enums_to_lowercase = true;
+    /// Serde enums to snake lowercase and strip prefix
+    pub fn strip_enum_vairant_prefix_and_to_lowercase(&mut self) -> &mut Self {
+        self.strip_enum_vairant_prefix_and_to_lowercase = true;
         self
     }
 
@@ -275,6 +275,7 @@ impl Builder {
                 &self.extern_paths,
                 type_path.package(),
                 self.retain_enum_prefix,
+                self.strip_enum_vairant_prefix_and_to_lowercase,
             );
 
             match descriptor {
@@ -284,7 +285,6 @@ impl Builder {
                     descriptor,
                     writer,
                     self.use_integers_for_enums,
-                    self.enums_to_lowercase,
                 )?,
                 Descriptor::Message(descriptor) => {
                     if let Some(message) = resolve_message(&self.descriptors, descriptor) {

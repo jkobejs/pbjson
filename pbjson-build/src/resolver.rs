@@ -4,6 +4,7 @@ use crate::descriptor::{Package, TypePath};
 pub struct Resolver<'a> {
     extern_types: &'a [(String, String)],
     retain_enum_prefix: bool,
+    strip_enum_vairant_prefix_and_to_lowercase: bool,
     package: &'a Package,
 }
 
@@ -13,11 +14,13 @@ impl<'a> Resolver<'a> {
         extern_types: &'a [(String, String)],
         package: &'a Package,
         retain_enum_prefix: bool,
+        strip_enum_vairant_prefix_and_to_lowercase: bool,
     ) -> Self {
         Resolver {
             extern_types,
             package,
             retain_enum_prefix,
+            strip_enum_vairant_prefix_and_to_lowercase,
         }
     }
 
@@ -103,6 +106,27 @@ impl<'a> Resolver<'a> {
             }
         }
     }
+
+    pub fn variant_name_value(&self, enumeration: &TypePath, variant: &str) -> String {
+        if !self.strip_enum_vairant_prefix_and_to_lowercase {
+            return variant.to_string();
+        }
+
+        use heck::ToSnakeCase;
+        let variant = variant.to_snake_case().to_lowercase();
+        let prefix = enumeration
+            .path()
+            .last()
+            .unwrap()
+            .to_string()
+            .to_snake_case()
+            .to_lowercase();
+        let stripped = variant
+            .strip_prefix(&format!("{}_", prefix))
+            .unwrap_or(&variant);
+
+        stripped.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -121,7 +145,7 @@ mod tests {
                 "foo::bar::Buz".to_string(),
             ),
         ];
-        let resolver = Resolver::new(extern_types, &resolver_package, false);
+        let resolver = Resolver::new(extern_types, &resolver_package, false, false);
 
         // A type in the same package
         let same_type = TypePath::new(resolver_package.clone()).child(TypeName::new("Foo"));
@@ -180,7 +204,7 @@ mod tests {
     // https://github.com/influxdata/pbjson/issues/48
     fn test_resolver_shared_prefix_false_match() {
         assert_eq!(
-            Resolver::new(&[], &Package::new("test.api.v1"), false).rust_type(
+            Resolver::new(&[], &Package::new("test.api.v1"), false, false).rust_type(
                 &TypePath::new(Package::new("test.domain.v1"))
                     .child(TypeName::new("Foo"))
                     .child(TypeName::new("Bar"))
@@ -192,7 +216,7 @@ mod tests {
     #[test]
     fn test_variant() {
         let package = Package::new("test.syntax3");
-        let resolver = Resolver::new(&[], &package, false);
+        let resolver = Resolver::new(&[], &package, false, false);
 
         let tests = [
             ("MyEnum", "MyEnumFoo", "Foo"),
