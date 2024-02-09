@@ -80,6 +80,7 @@
 )]
 
 use prost_types::FileDescriptorProto;
+use std::collections::HashSet;
 use std::io::{BufWriter, Error, ErrorKind, Result, Write};
 use std::path::PathBuf;
 
@@ -109,6 +110,7 @@ pub struct Builder {
     use_integers_for_enums: bool,
     preserve_proto_field_names: bool,
     strip_enum_vairant_prefix_and_to_lowercase: bool,
+    enum_prefixes_to_keep: HashSet<String>,
 }
 
 impl Builder {
@@ -206,6 +208,15 @@ impl Builder {
         self
     }
 
+    pub fn enum_prefixes_to_keep<S: Into<String>, I: IntoIterator<Item = S>>(
+        &mut self,
+        prefixes: I,
+    ) -> &mut Self {
+        self.enum_prefixes_to_keep
+            .extend(prefixes.into_iter().map(Into::into));
+        self
+    }
+
     /// Generates code for all registered types where `prefixes` contains a prefix of
     /// the fully-qualified path of the type
     pub fn build<S: AsRef<str>>(&mut self, prefixes: &[S]) -> Result<()> {
@@ -276,6 +287,7 @@ impl Builder {
                 type_path.package(),
                 self.retain_enum_prefix,
                 self.strip_enum_vairant_prefix_and_to_lowercase,
+                &self.enum_prefixes_to_keep,
             );
 
             match descriptor {
