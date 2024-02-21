@@ -107,6 +107,7 @@ pub struct Builder {
     ignore_unknown_fields: bool,
     btree_map_paths: Vec<String>,
     emit_fields: bool,
+    emit_enum_fields: bool,
     use_integers_for_enums: bool,
     preserve_proto_field_names: bool,
     strip_enum_vairant_prefix_and_to_lowercase: bool,
@@ -189,6 +190,13 @@ impl Builder {
         self.emit_fields = true;
         self
     }
+
+    /// Output enum fields with their default values.
+    pub fn emit_enum_fields(&mut self) -> &mut Self {
+        self.emit_enum_fields = true;
+        self
+    }
+
     // print integers instead of enum names.
     pub fn use_integers_for_enums(&mut self) -> &mut Self {
         self.use_integers_for_enums = true;
@@ -307,6 +315,7 @@ impl Builder {
                             self.ignore_unknown_fields,
                             &self.btree_map_paths,
                             self.emit_fields,
+                            self.emit_enum_fields,
                             self.preserve_proto_field_names,
                         )?
                     }
