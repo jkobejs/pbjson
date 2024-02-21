@@ -99,8 +99,11 @@ fn write_field_empty_predicate<W: Write>(
         (FieldType::Scalar(ScalarType::Bool), FieldModifier::UseDefault) => {
             write!(writer, "self.{}", member.rust_field_name())
         }
-        (FieldType::Enum(_), FieldModifier::UseDefault)
-        | (FieldType::Scalar(ScalarType::I64), FieldModifier::UseDefault)
+        (FieldType::Enum(_), FieldModifier::UseDefault) => {
+            write!(writer, "true")
+        }
+         
+        (FieldType::Scalar(ScalarType::I64), FieldModifier::UseDefault)
         | (FieldType::Scalar(ScalarType::I32), FieldModifier::UseDefault)
         | (FieldType::Scalar(ScalarType::U32), FieldModifier::UseDefault)
         | (FieldType::Scalar(ScalarType::U64), FieldModifier::UseDefault) => {
