@@ -108,6 +108,7 @@ pub struct Builder {
     btree_map_paths: Vec<String>,
     emit_fields: bool,
     emit_enum_fields: bool,
+    emit_repeated: bool,
     use_integers_for_enums: bool,
     preserve_proto_field_names: bool,
     strip_enum_vairant_prefix_and_to_lowercase: bool,
@@ -194,6 +195,12 @@ impl Builder {
     /// Output enum fields with their default values.
     pub fn emit_enum_fields(&mut self) -> &mut Self {
         self.emit_enum_fields = true;
+        self
+    }
+
+    // Output repeated fields if empty.
+    pub fn emit_repeated(&mut self) -> &mut Self {
+        self.emit_repeated = true;
         self
     }
 
@@ -316,6 +323,7 @@ impl Builder {
                             &self.btree_map_paths,
                             self.emit_fields,
                             self.emit_enum_fields,
+                            self.emit_repeated,
                             self.preserve_proto_field_names,
                         )?
                     }

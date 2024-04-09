@@ -42,6 +42,7 @@ pub fn generate_message<W: Write>(
     btree_map_paths: &[String],
     emit_fields: bool,
     emit_enum_fields: bool,
+    emit_repeated: bool,
     preserve_proto_field_names: bool,
 ) -> Result<()> {
     let rust_type = resolver.rust_type(&message.path);
@@ -55,6 +56,7 @@ pub fn generate_message<W: Write>(
         writer,
         emit_fields,
         emit_enum_fields,
+        emit_repeated,
         preserve_proto_field_names,
     )?;
     write_serialize_end(0, writer)?;
@@ -79,6 +81,7 @@ fn write_field_empty_predicate<W: Write>(
     writer: &mut W,
     emit_fields: bool,
     emit_enum_fields: bool,
+    emit_repeated: bool,
 ) -> Result<()> {
     if emit_fields {
         return write!(writer, "true");
@@ -86,8 +89,14 @@ fn write_field_empty_predicate<W: Write>(
 
     match (&member.field_type, &member.field_modifier) {
         (_, FieldModifier::Required) => unreachable!(),
-        (_, FieldModifier::Repeated)
-        | (FieldType::Map(_, _), _)
+        (_, FieldModifier::Repeated) => {
+            if emit_repeated {
+                write!(writer, "true")
+            } else {
+                write!(writer, "!self.{}.is_empty()", member.rust_field_name())
+            }
+        }
+        (FieldType::Map(_, _), _)
         | (FieldType::Scalar(ScalarType::String), FieldModifier::UseDefault)
         | (FieldType::Scalar(ScalarType::Bytes), FieldModifier::UseDefault) => {
             write!(writer, "!self.{}.is_empty()", member.rust_field_name())
@@ -109,7 +118,6 @@ fn write_field_empty_predicate<W: Write>(
                 write!(writer, "self.{} != 0", member.rust_field_name())
             }
         }
-
         (FieldType::Scalar(ScalarType::I64), FieldModifier::UseDefault)
         | (FieldType::Scalar(ScalarType::I32), FieldModifier::UseDefault)
         | (FieldType::Scalar(ScalarType::U32), FieldModifier::UseDefault)
@@ -126,9 +134,17 @@ fn write_message_serialize<W: Write>(
     writer: &mut W,
     emit_fields: bool,
     emit_enum_fields: bool,
+    emit_repeated: bool,
     preserve_proto_field_names: bool,
 ) -> Result<()> {
-    write_struct_serialize_start(indent, message, writer, emit_fields, emit_enum_fields)?;
+    write_struct_serialize_start(
+        indent,
+        message,
+        writer,
+        emit_fields,
+        emit_enum_fields,
+        emit_repeated,
+    )?;
 
     for field in &message.fields {
         write_serialize_field(
@@ -138,6 +154,7 @@ fn write_message_serialize<W: Write>(
             writer,
             emit_fields,
             emit_enum_fields,
+            emit_repeated,
             preserve_proto_field_names,
         )?;
     }
@@ -155,6 +172,7 @@ fn write_struct_serialize_start<W: Write>(
     writer: &mut W,
     emit_fields: bool,
     emit_enum_fields: bool,
+    emit_repeated: bool,
 ) -> Result<()> {
     writeln!(writer, "{}use serde::ser::SerializeStruct;", Indent(indent))?;
 
@@ -175,7 +193,7 @@ fn write_struct_serialize_start<W: Write>(
             continue;
         }
         write!(writer, "{}if ", Indent(indent))?;
-        write_field_empty_predicate(field, writer, emit_fields, emit_enum_fields)?;
+        write_field_empty_predicate(field, writer, emit_fields, emit_enum_fields, emit_repeated)?;
         writeln!(writer, " {{")?;
         writeln!(writer, "{}len += 1;", Indent(indent + 1))?;
         writeln!(writer, "{}}}", Indent(indent))?;
@@ -412,6 +430,7 @@ fn write_serialize_field<W: Write>(
     writer: &mut W,
     emit_fields: bool,
     emit_enum_fields: bool,
+    emit_repeated: bool,
     preserve_proto_field_names: bool,
 ) -> Result<()> {
     let as_ref = format!("&self.{}", field.rust_field_name());
@@ -456,7 +475,13 @@ fn write_serialize_field<W: Write>(
         }
         FieldModifier::Repeated | FieldModifier::UseDefault => {
             write!(writer, "{}if ", Indent(indent))?;
-            write_field_empty_predicate(field, writer, emit_fields, emit_enum_fields)?;
+            write_field_empty_predicate(
+                field,
+                writer,
+                emit_fields,
+                emit_enum_fields,
+                emit_repeated,
+            )?;
             writeln!(writer, " {{")?;
             write_serialize_variable(
                 resolver,
