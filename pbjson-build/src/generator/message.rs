@@ -96,8 +96,10 @@ fn write_field_empty_predicate<W: Write>(
                 write!(writer, "!self.{}.is_empty()", member.rust_field_name())
             }
         }
+        (FieldType::Scalar(ScalarType::String), FieldModifier::UseDefault) => {
+            write!(writer, "true")
+        }
         (FieldType::Map(_, _), _)
-        | (FieldType::Scalar(ScalarType::String), FieldModifier::UseDefault)
         | (FieldType::Scalar(ScalarType::Bytes), FieldModifier::UseDefault) => {
             write!(writer, "!self.{}.is_empty()", member.rust_field_name())
         }
