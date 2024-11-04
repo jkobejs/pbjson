@@ -212,6 +212,7 @@ impl Builder {
     }
 
     // print integers instead of enum names.
+    /// Print integers instead of enum names.
     pub fn use_integers_for_enums(&mut self) -> &mut Self {
         self.use_integers_for_enums = true;
         self
